@@ -4,6 +4,7 @@
 [submodule "rabit"]
 	path = rabit
 	url = https://github.com/bobjiang82/rabit
+	branch = oneccl
 [submodule "cub"]
 	path = cub
 	url = https://github.com/NVlabs/cub
