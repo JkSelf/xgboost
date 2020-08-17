@@ -55,7 +55,10 @@ target_include_directories(objxgboost
   PRIVATE
   ${xgboost_SOURCE_DIR}/include
   ${xgboost_SOURCE_DIR}/dmlc-core/include
-  ${xgboost_SOURCE_DIR}/rabit/include)
+  ${xgboost_SOURCE_DIR}/rabit/include
+  ${OPENSSL_INCLUDE_DIR}
+  $ENV{CCL_ROOT}/include
+  )
 target_compile_options(objxgboost
   PRIVATE
   $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/MP>

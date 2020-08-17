@@ -108,6 +108,7 @@ if (USE_CUDA)
 endif (USE_CUDA)
 
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 if (USE_OPENMP)
   if (APPLE)
@@ -117,6 +118,8 @@ if (USE_OPENMP)
   endif (APPLE)
   find_package(OpenMP REQUIRED)
 endif (USE_OPENMP)
+
+add_definitions(-DUSE_OCCL)
 
 # core xgboost
 add_subdirectory(${xgboost_SOURCE_DIR}/src)
@@ -139,7 +142,7 @@ endif (MSVC)
 if (ENABLE_ALL_WARNINGS)
   target_compile_options(dmlc PRIVATE -Wall -Wextra)
 endif (ENABLE_ALL_WARNINGS)
-target_link_libraries(objxgboost PUBLIC dmlc)
+target_link_libraries(objxgboost PUBLIC dmlc ${OPENSSL_CRYPTO_LIBRARY})
 
 # rabit
 set(RABIT_BUILD_DMLC OFF)
@@ -154,13 +157,16 @@ if (RABIT_MOCK)
                            -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
   endif (MSVC)
 else()
-  target_link_libraries(objxgboost PUBLIC rabit)
+  target_link_libraries(objxgboost PUBLIC rabit_occl ${CMAKE_DL_LIBS})
   if (MSVC)
     target_compile_options(rabit PRIVATE
                            -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
   endif (MSVC)
 endif(RABIT_MOCK)
-foreach(lib rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
+#foreach(lib rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
+#foreach(lib rabit_base)
+#foreach(lib rabit_mpi)
+foreach(lib rabit_occl)
   # Explicitly link dmlc to rabit, so that configured header (build_config.h)
   # from dmlc is correctly applied to rabit.
   if (TARGET ${lib})
@@ -188,7 +194,7 @@ if (BUILD_STATIC_LIB)
 else (BUILD_STATIC_LIB)
   add_library(xgboost SHARED)
 endif (BUILD_STATIC_LIB)
-target_link_libraries(xgboost PRIVATE objxgboost)
+target_link_libraries(xgboost PRIVATE objxgboost ${OPENSSL_CRYPTO_LIBRARY})
 
 if (USE_NVTX)
   enable_nvtx(xgboost)
@@ -213,7 +219,7 @@ endif (JVM_BINDINGS)
 
 #-- CLI for xgboost
 add_executable(runxgboost ${xgboost_SOURCE_DIR}/src/cli_main.cc)
-target_link_libraries(runxgboost PRIVATE objxgboost)
+target_link_libraries(runxgboost PRIVATE objxgboost  ${OPENSSL_CRYPTO_LIBRARY})
 if (USE_NVTX)
   enable_nvtx(runxgboost)
 endif (USE_NVTX)
@@ -222,7 +228,10 @@ target_include_directories(runxgboost
   PRIVATE
   ${xgboost_SOURCE_DIR}/include
   ${xgboost_SOURCE_DIR}/dmlc-core/include
-  ${xgboost_SOURCE_DIR}/rabit/include)
+  ${xgboost_SOURCE_DIR}/rabit/include
+  ${OPENSSL_INCLUDE_DIR}
+  )
+
 set_target_properties(
   runxgboost PROPERTIES
   OUTPUT_NAME xgboost

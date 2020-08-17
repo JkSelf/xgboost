@@ -869,6 +869,26 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_RabitInit
   for (size_t i = 0; i < args.size(); ++i) {
     argv.push_back(&args[i][0]);
   }
+/* e.g.
+xgbtck CCL_WORLD_SIZE=28
+xgbtck CCL_KVS_IP_PORT=10.1.2.198_51234
+xgbtck CCL_ATL_TRANSPORT=ofi
+xgbtck CCL_PM_TYPE=resizable
+xgbtck CCL_KVS_IP_EXCHANGE=env
+xgbtck CCL_ATL_TRANSPORT_PATH=/mnt/DP_disk8/yuzhou/yarn/local/usercache/yuzhou/appcache/application_1597366619912_0105/container_1597366619912_0105_01_000002/tmp/lib
+*/
+  std::cerr << "set env for oneCCL:" << std::endl;
+  for (size_t i = 0; i < args.size(); ++i) {
+    std::string s = args[i];
+    if (s.rfind("OCCLENV_", 0) == 0) {
+      std::string key_value = s.substr(8, s.length()-8);
+      int delimpos = key_value.find("=");
+      std::string key = key_value.substr(0, delimpos);
+      std::string value = key_value.substr(delimpos+1, key_value.length()-delimpos-1);
+      std::cerr << key << " : " << value << std::endl;
+      setenv(key.c_str(), value.c_str(), 1);
+    }
+  }
 
   if (RabitInit(args.size(), dmlc::BeginPtr(argv))) {
     return 0;

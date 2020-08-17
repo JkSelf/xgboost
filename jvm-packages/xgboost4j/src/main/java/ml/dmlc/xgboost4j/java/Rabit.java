@@ -63,7 +63,14 @@ public class Rabit {
    */
   public static void init(Map<String, String> envs) throws XGBoostError {
     rabitEnvs = envs;
-    String[] args = new String[envs.size() + mockList.size()];
+    Map<String, String> occlEnvs = new java.util.HashMap<String, String>();
+    occlEnvs.put("OCCLENV_CCL_ATL_TRANSPORT", "ofi");
+    occlEnvs.put("OCCLENV_CCL_PM_TYPE", "resizable");
+    occlEnvs.put("OCCLENV_CCL_KVS_IP_EXCHANGE", "env");
+    occlEnvs.put("OCCLENV_CCL_ATL_TRANSPORT_PATH", System.getProperty("java.io.tmpdir") + "/lib");
+    // occlEnvs.put();
+
+    String[] args = new String[envs.size() + mockList.size() + occlEnvs.size()];
     int idx = 0;
     for (java.util.Map.Entry<String, String> e : envs.entrySet()) {
       args[idx++] = e.getKey() + '=' + e.getValue();
@@ -72,6 +79,11 @@ public class Rabit {
     for(String mock : mockList) {
       args[idx++] =  "mock=" + mock;
     }
+    // pass list of occl environment variables
+    for(java.util.Map.Entry<String, String> oc : occlEnvs.entrySet()) {
+      args[idx++] =  oc.getKey() + '=' + oc.getValue();
+    }
+
     checkCall(XGBoostJNI.RabitInit(args));
   }
 

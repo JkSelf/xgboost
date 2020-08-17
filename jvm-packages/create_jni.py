@@ -110,6 +110,14 @@ if __name__ == "__main__":
     maybe_makedirs("xgboost4j/src/main/resources/lib")
     cp("../lib/" + library_name, "xgboost4j/src/main/resources/lib")
 
+    pathdestlib = "xgboost4j/src/main/resources/lib"
+    maybe_makedirs(pathdestlib)
+    cp(os.environ['CCL_ROOT']+"/lib/libccl_atl_ofi.so.1", pathdestlib + "/libccl_atl_ofi.so")
+    cp(os.environ['CCL_ROOT']+"/lib/libfabric.so.1", pathdestlib + "/libfabric.so")
+    cp(os.environ['CCL_ROOT']+"/lib/libpmi.so.1", pathdestlib + "/libpmi.so")
+    cp(os.environ['CCL_ROOT']+"/lib/libresizable_pmi.so.1", pathdestlib + "/libresizable_pmi.so")
+    cp(os.environ['CCL_ROOT']+"/lib/prov/libsockets-fi.so", pathdestlib + "/libsockets-fi.so")
+
     print("copying pure-Python tracker")
     cp("../dmlc-core/tracker/dmlc_tracker/tracker.py",
        "xgboost4j/src/main/resources")
