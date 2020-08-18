@@ -17,6 +17,7 @@ package ml.dmlc.xgboost4j.java;
 
 import java.io.*;
 import java.lang.reflect.Field;
+import java.nio.file.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,6 +33,13 @@ class NativeLibLoader {
   private static boolean initialized = false;
   private static final String nativeResourcePath = "/lib/";
   private static final String[] libNames = new String[]{"xgboost4j"};
+  private static final String[] libExtractNames = new String[]{
+      "libpmi.so",
+      "libresizable_pmi.so.1",
+      "libfabric.so.1",
+      "libsockets-fi.so",
+      "libccl_atl_ofi.so"
+      };  // note: the order matters
 
   static synchronized void initXGBoost() throws IOException {
     if (!initialized) {
@@ -44,6 +52,20 @@ class NativeLibLoader {
           throw ioe;
         }
       }
+      for (String libName : libExtractNames) {
+        try {
+          String libraryFromJar = nativeResourcePath + libName;
+          String libDestPathname = extractLibFromJar(libraryFromJar);
+          // extracted, load the library
+          if (!libDestPathname.isEmpty()) {
+            System.load(libDestPathname);
+          }
+        } catch (IOException ioe) {
+          logger.error("failed to extract " + libName + " library from jar");
+          throw ioe;
+        }
+      }
+
       initialized = true;
     }
   }
@@ -67,8 +89,63 @@ class NativeLibLoader {
    */
   private static void loadLibraryFromJar(String path) throws IOException, IllegalArgumentException{
     String temp = createTempFileFromResource(path);
+    logger.info("xgbtck abspath: " + temp);
     // Finally, load the library
     System.load(temp);
+  }
+
+  private static String extractLibFromJar(String path) throws IOException, IllegalArgumentException{
+    String[] parts = path.split("/");
+    String filename = (parts.length > 1) ? parts[parts.length - 1] : null;
+
+    // Split filename to prexif and suffix (extension)
+    String prefix = "";
+    String suffix = null;
+    if (filename != null) {
+      parts = filename.split("\\.", 2);
+      prefix = parts[0];
+      suffix = (parts.length > 1) ? "." + parts[parts.length - 1] : null;
+    }
+
+    // Check if the filename is okay
+    if (filename == null) {
+      throw new IllegalArgumentException("The filename is null.");
+    }
+
+    String tmpdir = System.getProperty("java.io.tmpdir") + "/lib";
+    new File(tmpdir).mkdirs();
+    File fileOut = new File(tmpdir + "/" + filename);
+    if (fileOut == null) {
+      logger.error("new File(" + filename + ") returns null.");
+      return "";
+    }
+
+    // Prepare buffer for data copying
+    byte[] buffer = new byte[1024];
+    int readBytes;
+
+    // Open and check input stream
+    InputStream is = NativeLibLoader.class.getResourceAsStream("/lib/" + prefix + ".so");
+    if (is == null) {
+      throw new FileNotFoundException(
+        "File " + "/lib/" + prefix + ".so" + " was not found inside JAR.");
+    }
+
+    // Open output stream and copy data between source file in JAR and the temporary file
+    OutputStream os = new FileOutputStream(fileOut);
+    try {
+      while ((readBytes = is.read(buffer)) != -1) {
+        os.write(buffer, 0, readBytes);
+      }
+    } finally {
+      // If read/write fails, close streams safely before throwing an exception
+      os.close();
+      is.close();
+    }
+
+    // logger.info("xgbtck abspath: " + fileOut.getAbsolutePath());
+
+    return fileOut.getAbsolutePath();
   }
 
   /**

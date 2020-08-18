@@ -18,6 +18,7 @@ package ml.dmlc.xgboost4j.scala.spark
 
 import java.io.File
 import java.nio.file.Files
+import java.net.InetAddress
 
 import scala.collection.{AbstractIterator, mutable}
 import scala.util.Random
@@ -34,7 +35,7 @@ import org.apache.commons.logging.LogFactory
 import org.apache.hadoop.fs.FileSystem
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkContext, SparkParallelismTracker, TaskContext, TaskFailedListener}
+import org.apache.spark.{SparkConf, SparkContext, SparkParallelismTracker, TaskContext, TaskFailedListener}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.storage.StorageLevel
 
@@ -521,6 +522,20 @@ object XGBoost extends Serializable {
     }
   }
 
+  // Run on Driver
+  private def sparkExecutorNum(): Int = {
+    val conf = new SparkConf()
+    val executorNum = conf.getInt("spark.executor.instances", -1)
+    assert(executorNum != -1, message = "spark.executor.instances not set")
+    executorNum
+  }
+  private def sparkFirstExecutorIP(sc: SparkContext): String = {
+    val info = sc.statusTracker.getExecutorInfos
+    // get first executor, info(0) is driver
+    val host = info(1).host()
+    val ip = InetAddress.getByName(host).getHostAddress
+    ip
+  }
   /**
    * @return A tuple of the booster and the metrics used to build training summary
    */
@@ -552,6 +567,9 @@ object XGBoost extends Serializable {
           xgbExecParams.timeoutRequestWorkers,
           xgbExecParams.numWorkers)
         val rabitEnv = tracker.getWorkerEnvs
+        logger.info(s"rabitEnv: $rabitEnv")
+        rabitEnv.put("OCCLENV_CCL_WORLD_SIZE", sparkExecutorNum().toString)
+        rabitEnv.put("OCCLENV_CCL_KVS_IP_PORT", sparkFirstExecutorIP(sc) + "_51234")
         val boostersAndMetrics = if (hasGroup) {
           trainForRanking(transformedTrainingData.left.get, xgbExecParams, rabitEnv, prevBooster,
             evalSetsMap)

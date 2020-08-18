@@ -32,6 +32,7 @@ option(R_LIB "Build shared library for R package" OFF)
 ## Dev
 option(USE_DEBUG_OUTPUT "Dump internal training results like gradients and predictions to stdout.
 Should only be used for debugging." OFF)
+option(ENABLE_ALL_WARNINGS "Enable all compiler warnings. Only effective for GCC/Clang" OFF)
 option(GOOGLE_TEST "Build google tests" OFF)
 option(USE_DMLC_GTEST "Use google tests bundled with dmlc-core submodule" OFF)
 option(USE_NVTX "Build with cuda profiling annotations. Developers only." OFF)
@@ -79,6 +80,11 @@ endif (R_LIB AND GOOGLE_TEST)
 if (USE_AVX)
   message(SEND_ERROR  "The option 'USE_AVX' is deprecated as experimental AVX features have been removed from XGBoost.")
 endif (USE_AVX)
+if (ENABLE_ALL_WARNINGS)
+  if ((NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+    message(SEND_ERROR "ENABLE_ALL_WARNINGS is only available for Clang and GCC.")
+  endif ((NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+endif (ENABLE_ALL_WARNINGS)
 
 #-- Sanitizer
 if (USE_SANITIZER)
@@ -102,6 +108,7 @@ if (USE_CUDA)
 endif (USE_CUDA)
 
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 if (USE_OPENMP)
   if (APPLE)
@@ -112,6 +119,11 @@ if (USE_OPENMP)
   find_package(OpenMP REQUIRED)
 endif (USE_OPENMP)
 
+add_definitions(-DUSE_OCCL)
+
+# core xgboost
+add_subdirectory(${xgboost_SOURCE_DIR}/src)
+
 # dmlc-core
 msvc_use_static_runtime()
 add_subdirectory(${xgboost_SOURCE_DIR}/dmlc-core)
@@ -119,7 +131,6 @@ set_target_properties(dmlc PROPERTIES
   CXX_STANDARD 14
   CXX_STANDARD_REQUIRED ON
   POSITION_INDEPENDENT_CODE ON)
-list(APPEND LINKED_LIBRARIES_PRIVATE dmlc)
 if (MSVC)
   target_compile_options(dmlc PRIVATE
                          -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
@@ -128,6 +139,10 @@ if (MSVC)
                            -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
   endif (TARGET dmlc_unit_tests)
 endif (MSVC)
+if (ENABLE_ALL_WARNINGS)
+  target_compile_options(dmlc PRIVATE -Wall -Wextra)
+endif (ENABLE_ALL_WARNINGS)
+target_link_libraries(objxgboost PUBLIC dmlc ${OPENSSL_CRYPTO_LIBRARY})
 
 # rabit
 set(RABIT_BUILD_DMLC OFF)
@@ -136,19 +151,22 @@ set(RABIT_WITH_R_LIB ${R_LIB})
 add_subdirectory(rabit)
 
 if (RABIT_MOCK)
-  list(APPEND LINKED_LIBRARIES_PRIVATE rabit_mock_static)
+  target_link_libraries(objxgboost PUBLIC rabit_mock_static)
   if (MSVC)
     target_compile_options(rabit_mock_static PRIVATE
                            -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
   endif (MSVC)
 else()
-  list(APPEND LINKED_LIBRARIES_PRIVATE rabit)
+  target_link_libraries(objxgboost PUBLIC rabit_occl ${CMAKE_DL_LIBS})
   if (MSVC)
     target_compile_options(rabit PRIVATE
                            -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE)
   endif (MSVC)
 endif(RABIT_MOCK)
-foreach(lib rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
+#foreach(lib rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
+#foreach(lib rabit_base)
+#foreach(lib rabit_mpi)
+foreach(lib rabit_occl)
   # Explicitly link dmlc to rabit, so that configured header (build_config.h)
   # from dmlc is correctly applied to rabit.
   if (TARGET ${lib})
@@ -156,6 +174,9 @@ foreach(lib rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
     if (HIDE_CXX_SYMBOLS)  # Hide all C++ symbols from Rabit
       set_target_properties(${lib} PROPERTIES CXX_VISIBILITY_PRESET hidden)
     endif (HIDE_CXX_SYMBOLS)
+    if (ENABLE_ALL_WARNINGS)
+      target_compile_options(${lib} PRIVATE -Wall -Wextra)
+    endif (ENABLE_ALL_WARNINGS)
   endif (TARGET ${lib})
 endforeach()
 
@@ -164,19 +185,16 @@ if (R_LIB)
   add_subdirectory(${xgboost_SOURCE_DIR}/R-package)
 endif (R_LIB)
 
-# core xgboost
-list(APPEND LINKED_LIBRARIES_PRIVATE Threads::Threads ${CMAKE_THREAD_LIBS_INIT})
+# Plugin
 add_subdirectory(${xgboost_SOURCE_DIR}/plugin)
-add_subdirectory(${xgboost_SOURCE_DIR}/src)
-target_link_libraries(objxgboost PUBLIC dmlc)
-set(XGBOOST_OBJ_SOURCES "${XGBOOST_OBJ_SOURCES};$<TARGET_OBJECTS:objxgboost>")
 
 #-- library
 if (BUILD_STATIC_LIB)
-  add_library(xgboost STATIC ${XGBOOST_OBJ_SOURCES})
+  add_library(xgboost STATIC)
 else (BUILD_STATIC_LIB)
-  add_library(xgboost SHARED ${XGBOOST_OBJ_SOURCES})
+  add_library(xgboost SHARED)
 endif (BUILD_STATIC_LIB)
+target_link_libraries(xgboost PRIVATE objxgboost ${OPENSSL_CRYPTO_LIBRARY})
 
 if (USE_NVTX)
   enable_nvtx(xgboost)
@@ -192,7 +210,6 @@ target_include_directories(xgboost
   INTERFACE
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
-target_link_libraries(xgboost PRIVATE ${LINKED_LIBRARIES_PRIVATE})
 
 # This creates its own shared library `xgboost4j'.
 if (JVM_BINDINGS)
@@ -201,7 +218,8 @@ endif (JVM_BINDINGS)
 #-- End shared library
 
 #-- CLI for xgboost
-add_executable(runxgboost ${xgboost_SOURCE_DIR}/src/cli_main.cc ${XGBOOST_OBJ_SOURCES})
+add_executable(runxgboost ${xgboost_SOURCE_DIR}/src/cli_main.cc)
+target_link_libraries(runxgboost PRIVATE objxgboost  ${OPENSSL_CRYPTO_LIBRARY})
 if (USE_NVTX)
   enable_nvtx(runxgboost)
 endif (USE_NVTX)
@@ -210,8 +228,10 @@ target_include_directories(runxgboost
   PRIVATE
   ${xgboost_SOURCE_DIR}/include
   ${xgboost_SOURCE_DIR}/dmlc-core/include
-  ${xgboost_SOURCE_DIR}/rabit/include)
-target_link_libraries(runxgboost PRIVATE ${LINKED_LIBRARIES_PRIVATE})
+  ${xgboost_SOURCE_DIR}/rabit/include
+  ${OPENSSL_INCLUDE_DIR}
+  )
+
 set_target_properties(
   runxgboost PROPERTIES
   OUTPUT_NAME xgboost
