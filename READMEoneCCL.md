@@ -28,7 +28,7 @@ We use [Apache Maven](https://maven.apache.org/) to manage and build source code
 To clone and build from open source oneCCL, run the following commands:
 ```
 	$ git clone https://github.com/oneapi-src/oneCCL
-    $ cd oneCCL && mkdir build && cd build
+	$ cd oneCCL && mkdir build && cd build
 	$ cmake ..
 	$ make -j install
 ```
