@@ -29,13 +29,13 @@ import org.apache.spark.ml.param.Param
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.adaptive.{AdaptiveExecutionContext, InsertAdaptiveSparkPlan}
-import org.apache.spark.sql.dynamicpruning.PlanDynamicPruningFilters
+import org.apache.spark.sql.execution.dynamicpruning.PlanDynamicPruningFilters
 import org.apache.spark.sql.execution.exchange.{EnsureRequirements, ReuseExchange}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.{Column, DataFrame, Row}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{FloatType, IntegerType}
-import org.apache.spark.sql.vectorized.{ArrowColumnVector, ColumnarBatch}
+import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import scala.collection.mutable.ListBuffer
 
@@ -170,7 +170,7 @@ object DataUtils extends Serializable {
         val qe = new QueryExecution(df.sparkSession, df.queryExecution.logical) {
           override protected def preparations: Seq[Rule[SparkPlan]] = {
             Seq(
-              InsertAdaptiveSparkPlan(AdaptiveExecutionContext(sparkSession)),
+              InsertAdaptiveSparkPlan(AdaptiveExecutionContext(sparkSession, this)),
               PlanDynamicPruningFilters(sparkSession),
               PlanSubqueries(sparkSession),
               EnsureRequirements(sparkSession.sessionState.conf),
@@ -201,7 +201,7 @@ object DataUtils extends Serializable {
             val buffers = ListBuffer[ArrowRecordBatchHandle.Buffer]()
             val dataTypes = ListBuffer[String]()
             for (i <- 0 until batch.numCols()) {
-              val vector = batch.column(i).asInstanceOf[ArrowColumnVector]
+              val vector = batch.column(i)
               val accessor = UtilReflection.getField(vector, "accessor")
               val valueVector = UtilReflection.getField(accessor, "accessor")
                 .asInstanceOf[ValueVector]
