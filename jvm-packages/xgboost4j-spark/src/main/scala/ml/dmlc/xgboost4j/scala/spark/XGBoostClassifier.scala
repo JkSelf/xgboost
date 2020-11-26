@@ -164,7 +164,7 @@ class XGBoostClassifier (
 
   override def fit(dataset: Dataset[_]): XGBoostClassificationModel = {
     val columnar = dataset.sqlContext
-      .getConf("org.apache.spark.example.columnar.enabled", "False").toBoolean
+      .getConf("xgboost.spark.arrow.optimization.enabled", "False").toBoolean
     if (columnar) {
       copyValues(train(dataset, columnar = true).setParent(this))
     } else {
