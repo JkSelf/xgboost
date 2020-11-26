@@ -31,7 +31,7 @@ class NativeLibLoader {
 
   private static boolean initialized = false;
   private static final String nativeResourcePath = "/lib/";
-  private static final String[] libNames = new String[]{"xgboost4j"};
+  private static final String[] libNames = new String[]{"arrow", "xgboost4j"};
 
   static synchronized void initXGBoost() throws IOException {
     if (!initialized) {
@@ -109,12 +109,9 @@ class NativeLibLoader {
       throw new IllegalArgumentException("The filename has to be at least 3 characters long.");
     }
     // Prepare temporary file
-    File temp = File.createTempFile(prefix, suffix);
-    temp.deleteOnExit();
-
-    if (!temp.exists()) {
-      throw new FileNotFoundException("File " + temp.getAbsolutePath() + " does not exist.");
-    }
+    File tempDir = new File(System.getProperty("java.io.tmpdir"));
+    String tempFileName = tempDir + "/" + prefix + suffix;
+    File temp = new File(tempFileName);
 
     // Prepare buffer for data copying
     byte[] buffer = new byte[1024];
