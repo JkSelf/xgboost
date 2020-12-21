@@ -28,6 +28,7 @@ option(BUILD_C_DOC "Build documentation for C APIs using Doxygen." OFF)
 option(USE_OPENMP "Build with OpenMP support." ON)
 option(BUILD_STATIC_LIB "Build static library" OFF)
 option(RABIT_BUILD_MPI "Build MPI" OFF)
+option(ARROW_HOME "Build with Arrow support." ON)
 ## Bindings
 option(JVM_BINDINGS "Build JVM bindings" OFF)
 option(R_LIB "Build shared library for R package" OFF)
