@@ -218,7 +218,7 @@ object DataUtils extends Serializable {
 
             }
             new ArrowRecordBatchHandle(batch.numRows(), dataTypes.toArray,
-              fields.toArray, buffers.toArray)
+              fields.toArray, buffers.toArray, batch)
           }
         }, labelArray(0)._2)
       }

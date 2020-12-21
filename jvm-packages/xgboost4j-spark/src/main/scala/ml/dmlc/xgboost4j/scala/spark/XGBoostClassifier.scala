@@ -31,11 +31,16 @@ import org.apache.spark.ml.param.shared.HasWeightCol
 import org.apache.spark.ml.util._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.execution.LogicalRDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.json4s.DefaultFormats
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.{AbstractIterator, Iterator, mutable}
 
 class XGBoostClassifier (
@@ -317,6 +322,70 @@ class XGBoostClassificationModel private[ml](
     throw new Exception("XGBoost-Spark does not support \'raw2probabilityInPlace\'")
   }
 
+  private def transformInternalWithArrow(dataset: Dataset[_]): DataFrame = {
+    val rawSchema = StructType(dataset.schema.fields)
+    val schema = StructType(dataset.schema.fields ++
+      Seq(StructField(name = _rawPredictionCol, dataType =
+        ArrayType(FloatType, containsNull = false), nullable = false)) ++
+      Seq(StructField(name = _probabilityCol, dataType =
+        ArrayType(FloatType, containsNull = false), nullable = false)))
+
+    val bBooster = dataset.sparkSession.sparkContext.broadcast(_booster)
+    val appName = dataset.sparkSession.sparkContext.appName
+
+    val width = dataset.schema.fields.length
+    val (trainingSet: RDD[ArrowRecordBatchHandle], labelColOffset: Int) = DataUtils
+      .convertDataFrameToArrowRecordBatchRDDs(
+        col($(labelCol)), $(numWorkers), needDeterministicRepartitioning,
+        dataset.asInstanceOf[DataFrame]).head
+
+    val resultRDD = trainingSet.mapPartitions { rowIterator =>
+      new AbstractIterator[Row] {
+
+        private val batchIterImpl = rowIterator.grouped(1).flatMap { batchRow =>
+
+          val rabitEnv = Array(
+            "DMLC_TASK_ID" -> TaskContext.getPartitionId().toString).toMap
+          Rabit.init(rabitEnv.asJava)
+
+          batchRow.iterator.flatMap { batch =>
+            val originalInternalRow = batch.getColumnarBatch.rowIterator()
+            val internalRows = new ArrayBuffer[InternalRow]()
+            originalInternalRow.asScala.foreach { columnBatchRow =>
+              internalRows += columnBatchRow.copy()
+            }
+            val dm = new DMatrix(labelColOffset, width, Iterator(batch))
+
+            try {
+              val Array(rawPredictionItr, probabilityItr, predLeafItr, predContribItr) =
+                producePredictionItrs(bBooster, dm)
+              produceResultIteratorWithInternalRow(internalRows.toIterator,
+                rawPredictionItr, probabilityItr, predLeafItr, predContribItr, rawSchema)
+
+            } finally {
+              dm.delete()
+              val buffers = batch.getBuffers()
+              buffers.foreach(_.getReferenceManager().release())
+            }
+          }
+        }
+
+        override def hasNext: Boolean = batchIterImpl.hasNext
+
+        override def next(): Row = {
+          val ret = batchIterImpl.next()
+          if (!batchIterImpl.hasNext) {
+            Rabit.shutdown()
+          }
+          ret
+        }
+      }
+    }
+
+    bBooster.unpersist(blocking = false)
+    dataset.sparkSession.createDataFrame(resultRDD, generateResultSchema(schema))
+  }
+
   // Generate raw prediction and probability prediction.
   private def transformInternal(dataset: Dataset[_]): DataFrame = {
 
@@ -421,6 +490,49 @@ class XGBoostClassificationModel private[ml](
     }
   }
 
+  private def produceResultIteratorWithInternalRow(
+      originalRowItr: Iterator[InternalRow],
+      rawPredictionItr: Iterator[Row],
+      probabilityItr: Iterator[Row],
+      predLeafItr: Iterator[Row],
+      predContribItr: Iterator[Row],
+      rawSchema: StructType): Iterator[Row] = {
+
+    // the following implementation is to be improved
+    if (isDefined(leafPredictionCol) && $(leafPredictionCol).nonEmpty &&
+      isDefined(contribPredictionCol) && $(contribPredictionCol).nonEmpty) {
+      originalRowItr.zip(rawPredictionItr).zip(probabilityItr).zip(predLeafItr).zip(predContribItr).
+        map { case ((((originals: InternalRow, rawPrediction: Row), probability: Row), leaves: Row),
+        contribs: Row) =>
+          Row.fromSeq(originals.toSeq(rawSchema) ++ rawPrediction.toSeq ++
+            probability.toSeq ++ leaves.toSeq ++
+            contribs.toSeq)
+        }
+    } else if (isDefined(leafPredictionCol) && $(leafPredictionCol).nonEmpty &&
+      (!isDefined(contribPredictionCol) || $(contribPredictionCol).isEmpty)) {
+      originalRowItr.zip(rawPredictionItr).zip(probabilityItr).zip(predLeafItr).
+        map { case (((originals: InternalRow,
+        rawPrediction: Row), probability: Row), leaves: Row) =>
+          Row.fromSeq(originals.toSeq(rawSchema) ++ rawPrediction.toSeq ++
+            probability.toSeq ++ leaves.toSeq)
+        }
+    } else if ((!isDefined(leafPredictionCol) || $(leafPredictionCol).isEmpty) &&
+      isDefined(contribPredictionCol) && $(contribPredictionCol).nonEmpty) {
+      originalRowItr.zip(rawPredictionItr).zip(probabilityItr).zip(predContribItr).
+        map { case (((originals: InternalRow,
+        rawPrediction: Row), probability: Row), contribs: Row) =>
+          Row.fromSeq(originals.toSeq(rawSchema) ++ rawPrediction.toSeq ++
+            probability.toSeq ++ contribs.toSeq)
+        }
+    } else {
+      originalRowItr.zip(rawPredictionItr).zip(probabilityItr).map {
+        case ((originals: InternalRow, rawPrediction: Row), probability: Row) =>
+          Row.fromSeq(originals.toSeq(rawSchema) ++ rawPrediction.toSeq ++ probability.toSeq)
+      }
+    }
+  }
+
+
   private def generateResultSchema(fixedSchema: StructType): StructType = {
     var resultSchema = fixedSchema
     if (isDefined(leafPredictionCol)) {
@@ -462,16 +574,22 @@ class XGBoostClassificationModel private[ml](
   }
 
   override def transform(dataset: Dataset[_]): DataFrame = {
-    transformSchema(dataset.schema, logging = true)
     if (isDefined(thresholds)) {
       require($(thresholds).length == numClasses, this.getClass.getSimpleName +
         ".transform() called with non-matching numClasses and thresholds.length." +
         s" numClasses=$numClasses, but thresholds has length ${$(thresholds).length}")
     }
 
+    val columnar = dataset.sqlContext
+      .getConf("xgboost.spark.arrow.optimization.enabled", "False").toBoolean
     // Output selected columns only.
     // This is a bit complicated since it tries to avoid repeated computation.
-    var outputData = transformInternal(dataset)
+    var outputData = if (columnar) {
+      transformInternalWithArrow(dataset)
+    } else {
+      transformSchema(dataset.schema, logging = true)
+      transformInternal(dataset)
+    }
     var numColsOutput = 0
 
     val rawPredictionUDF = udf { rawPrediction: mutable.WrappedArray[Float] =>
