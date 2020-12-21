@@ -9,7 +9,7 @@ Prerequisites
 
 Build Arrow Datasource Jar
 ===================================
-You can refer `Unified Arrow Data Source<https://github.com/Intel-bigdata/OAP/blob/master/oap-data-source/arrow/README.md>`_  to compile the spark-arrow-datasource*.jar.
+You can refer `Unified Arrow Data Source <https://github.com/Intel-bigdata/OAP/blob/master/oap-data-source/arrow/README.md>`_  to compile the spark-arrow-datasource*.jar.
 
 Build And Install Apache Arrow
 ===================================
@@ -25,7 +25,7 @@ Build And Install Apache Arrow
   make
   make install
 
-Setting up ARROW_HOME variable, add the following command to ~/.bashrc file.
+Setting up ARROW_HOME variable, add the following command to ``~/.bashrc`` file.
 
 .. code-block:: none
 
@@ -40,7 +40,7 @@ Building Java package from XGBoost Source Code
   cd arrow/java
   mvn clean  package -DskipTests -Dmaven.test.skip=true
 
-Then you can get the xgboost*.jar and xgboost-spark*.jar in ./xgboost4j-spark/target/xgboost4j-spark_2.12-1.3.0-SNAPSHOT.jar and ./xgboost4j/target/xgboost4j_2.12-1.3.0-SNAPSHOT.jar paths.
+Then you can get the ``xgboost*.jar`` and ``xgboost-spark*.jar`` in ``./xgboost4j-spark/target/xgboost4j-spark_2.12-1.3.0-SNAPSHOT.jar`` and ``./xgboost4j/target/xgboost4j_2.12-1.3.0-SNAPSHOT.jar`` paths.
 
 Download Spark 3.0.0
 ================================================
@@ -56,7 +56,7 @@ Currently xgboost spark with arrow datasource optimization works on the Spark 3.
 ********************************************
 Get Started
 ********************************************
-You can refer `Unified Arrow Data Source<https://github.com/Intel-bigdata/OAP/blob/master/oap-data-source/arrow/README.md>`_  to deploy the spark-arrow-datasource*.jar. And the deploy approach of the xgboost*.jar and xgboost-spark*.jar is same with the upstream XGBoost without any additional operations.
+You can refer `Unified Arrow Data Source <https://github.com/Intel-bigdata/OAP/blob/master/oap-data-source/arrow/README.md>`_  to deploy the ``spark-arrow-datasource*.jar``. And the deploy approach of the ``xgboost*.jar`` and ``xgboost-spark*.jar`` is same with the upstream XGBoost without any additional operations.
 
 ********************************************
 Note
