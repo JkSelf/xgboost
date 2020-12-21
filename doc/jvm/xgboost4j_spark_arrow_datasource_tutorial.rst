@@ -61,4 +61,4 @@ You can refer `Unified Arrow Data Source <https://github.com/Intel-bigdata/OAP/b
 ********************************************
 Note
 ********************************************
-Currently this optimization doesn't support ``limit``, ``coalesce`` and other sql operators, and we will support more operators in the future.
+You don't need to use the ``VectorAssembler`` to assemble ``feature`` columns before training. Currently this optimization doesn't support ``limit``, ``coalesce`` and other sql operators, and we will support more operators in the future.
