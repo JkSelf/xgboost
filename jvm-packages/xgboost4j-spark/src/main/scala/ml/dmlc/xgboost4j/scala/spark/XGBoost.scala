@@ -522,11 +522,13 @@ object XGBoost extends Serializable {
           throw new XGBoostError("Building watches failed")
     } finally {
      trainingData.foreachPartition{ handles =>
-       val handle = handles.next()
-       val buffers = handle.getBuffers();
-       buffers.foreach(_.getReferenceManager().release())
+       handles.foreach { handle =>
+         val buffers = handle.getBuffers();
+         buffers.foreach(_.getReferenceManager().release())
+       }
      }
     }
+
     if (xgbExecutionParams.isLocal) {
       watchRdd.mapPartitions(iter => {
         val watches = iter.next

@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.arrow.memory.ReferenceManager;
+import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 /**
  * Hold pointers to a Arrow C++ RecordBatch.
@@ -33,6 +34,7 @@ public class ArrowRecordBatchHandle {
   private final Field[] fields;
   private final Buffer[] buffers;
   private final String[] dataTypes;
+  private final ColumnarBatch columnarBatch;
 
   /**
    * Constructor.
@@ -42,11 +44,12 @@ public class ArrowRecordBatchHandle {
    * @param buffers Retained Arrow buffers
    */
   public ArrowRecordBatchHandle(long numRows, String[] dataTypes,
-      Field[] fields, Buffer[] buffers) {
+      Field[] fields, Buffer[] buffers, ColumnarBatch columnarBatch) {
     this.numRows = numRows;
     this.dataTypes = dataTypes;
     this.fields = fields;
     this.buffers = buffers;
+    this.columnarBatch = columnarBatch;
   }
 
   /**
@@ -72,6 +75,10 @@ public class ArrowRecordBatchHandle {
    */
   public Buffer[] getBuffers() {
     return buffers;
+  }
+
+  public ColumnarBatch getColumnarBatch() {
+    return columnarBatch;
   }
 
   /**
