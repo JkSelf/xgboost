@@ -45,14 +45,14 @@ public class DMatrix {
    * @param iter The data iterator of ArrowRecordBatchHandle to provide the data.
    * @throws XGBoostError
    */
-  public DMatrix(int labelColOffset, int width, Iterator<ArrowRecordBatchHandle> iter)
+  public DMatrix(int labelColOffset, int width, int nthread, Iterator<ArrowRecordBatchHandle> iter)
           throws XGBoostError {
     if (iter == null) {
       throw new NullPointerException("iter: null");
     }
     long[] out = new long[1];
     XGBoostJNI.checkCall(XGBoostJNI.XGDMatrixCreateByRecordBatchIters(labelColOffset,
-           width, iter, out));
+           width, nthread, iter, out));
     handle = out[0];
   }
 

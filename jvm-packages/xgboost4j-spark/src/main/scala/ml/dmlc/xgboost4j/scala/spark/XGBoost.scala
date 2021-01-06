@@ -1053,8 +1053,9 @@ private object Watches {
       }
       accepted
     }
-    val trainMatrix = new DMatrix(labelColOffset, width, trainBatches)
-    val testMatrix = new DMatrix(labelColOffset, width, testBatches.iterator)
+    val trainMatrix = new DMatrix(labelColOffset, width, xgbExecutionParams.nThread, trainBatches)
+    val testMatrix = new DMatrix(
+      labelColOffset, width, xgbExecutionParams.nThread, testBatches.iterator)
 
     new Watches(Array(trainMatrix, testMatrix), Array("train", "test"), cacheDirName)
   }

@@ -278,7 +278,7 @@ class JRecordBatchReader : public arrow::RecordBatchReader {
  * Signature: (IILjava/util/Iterator;[J)I
  */
 JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateByRecordBatchIters
-    (JNIEnv *jenv, jclass jcls, jint label_name_offset, jint width, jobject jiter, jlongArray jout) {
+    (JNIEnv *jenv, jclass jcls, jint label_name_offset, jint width, jint nthread, jobject jiter, jlongArray jout) {
   DMatrixHandle result;
   std::unique_ptr<arrow::RecordBatchReader> jr;
   jr.reset(new JRecordBatchReader(jenv, jiter, width));
@@ -319,7 +319,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateByR
   #endif
 
   result = new std::shared_ptr<xgboost::DMatrix>(
-        xgboost::DMatrix::Create(&adapter, 0, -1));
+        xgboost::DMatrix::Create(&adapter, 0, nthread));
 
   setHandle(jenv, jout, result);
   return 0;

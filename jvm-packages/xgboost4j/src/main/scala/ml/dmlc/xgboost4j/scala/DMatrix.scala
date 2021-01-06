@@ -40,8 +40,8 @@ class DMatrix private[scala](private[scala] val jDMatrix: JDMatrix) {
     * @param dataIter An iterator of ArrowRecordBatchHandle
     * @throws XGBoostError native error
     */
-  def this(labelCol: Int, width: Int, dataIter: Iterator[ArrowRecordBatchHandle]) {
-    this(new JDMatrix(labelCol, width, dataIter.asJava))
+  def this(labelCol: Int, width: Int, nthread: Int, dataIter: Iterator[ArrowRecordBatchHandle]) {
+    this(new JDMatrix(labelCol, width, nthread, dataIter.asJava))
   }
 
   /**

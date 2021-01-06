@@ -354,7 +354,7 @@ class XGBoostClassificationModel private[ml](
             originalInternalRow.asScala.foreach { columnBatchRow =>
               internalRows += columnBatchRow.copy()
             }
-            val dm = new DMatrix(labelColOffset, width, Iterator(batch))
+            val dm = new DMatrix(labelColOffset, width, $(nthread), Iterator(batch))
 
             try {
               val Array(rawPredictionItr, probabilityItr, predLeafItr, predContribItr) =
