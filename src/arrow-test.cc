@@ -48,7 +48,7 @@ arrow::Status DMatrixFromParquet(const char* path, std::shared_ptr<xgboost::DMat
   arrow::TableBatchReader treader{*table};
   xgboost::data::RecordBatches rb;
   ARROW_RETURN_NOT_OK(treader.ReadAll(&rb));
-  xgboost::data::ArrowAdapter adapter(rb, label_col, nrow, ncol);
+  xgboost::data::ArrowAdapter adapter(rb, label_col, nrow, ncol, -1);
   dmat.reset(xgboost::DMatrix::Create(&adapter, 0, -1));
 
   return arrow::Status::OK();

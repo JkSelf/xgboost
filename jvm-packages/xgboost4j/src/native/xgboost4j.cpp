@@ -306,7 +306,6 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateByR
 	  batches_removed.push_back(batch_removed);
   }
   
- 
   std::shared_ptr<arrow::ChunkedArray> label_col;
   if (array_vector.size() == 0) {
 	 label_col = nullptr;
@@ -315,7 +314,7 @@ JNIEXPORT jint JNICALL Java_ml_dmlc_xgboost4j_java_XGBoostJNI_XGDMatrixCreateByR
   }
 
   #if defined(XGBOOST_BUILD_ARROW_SUPPORT)
-  xgboost::data::ArrowAdapter adapter(batches_removed, label_col, num_rows, num_cols);
+  xgboost::data::ArrowAdapter adapter(batches_removed, label_col, num_rows, num_cols, nthread);
   #endif
 
   result = new std::shared_ptr<xgboost::DMatrix>(
