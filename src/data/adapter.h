@@ -320,7 +320,8 @@ class ArrowAdapterBatch {
   ArrowAdapterBatch(const RecordBatches& record_batches,
                     const TableColumn& label_col,
                     xgboost::bst_row_t num_rows,
-                    xgboost::bst_feature_t num_cols)
+                    xgboost::bst_feature_t num_cols,
+                    int nthreads)
       : data_(record_batches),
         num_rows_(num_rows),
         num_columns_(num_cols) {
@@ -335,7 +336,7 @@ class ArrowAdapterBatch {
       std::transform(chunk_lengths.begin(), chunk_lengths.end(),
                 std::back_inserter(chunk_offsets),
                 [&k](size_t len) { size_t ret = k; k += len; return ret; });
-#pragma omp parallel for
+#pragma omp parallel for num_threads(nthreads)
       for (auto i = 0; i < arrs.size(); ++i) {
         auto ptr = CastArray<arrow::FloatType>(arrs[i], 0, false)->raw_values();
         std::move(ptr, ptr + chunk_lengths[i], &(labels_.data()[chunk_offsets[i]]));
@@ -410,8 +411,8 @@ class ArrowAdapter : public detail::SingleBatchDataIter<ArrowAdapterBatch> {
   ArrowAdapter(const RecordBatches& record_batches,
                const TableColumn& label_col,
                xgboost::bst_row_t num_rows,
-               xgboost::bst_feature_t num_cols)
-      : batch_(record_batches, label_col, num_rows, num_cols),
+               xgboost::bst_feature_t num_cols, int nthreads)
+      : batch_(record_batches, label_col, num_rows, num_cols, nthreads),
         num_rows_(num_rows), num_columns_(num_cols) {}
   const ArrowAdapterBatch& Value() const override { return batch_; }
   xgboost::bst_row_t NumRows() const { return num_rows_; }
